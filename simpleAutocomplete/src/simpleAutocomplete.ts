@@ -40,8 +40,8 @@ export class SimpleAutocomplete {
     this.state.isActive = true;
 
     if (this.canAutocomplete(activeTextEditor)) {
-      const idx = this.getNextMatchIdx(activeTextEditor);
-      const token = this.state.foundMatches[idx];
+      this.state.currentIdx = this.getNextMatchIdx(activeTextEditor);
+      const token = this.state.foundMatches[this.state.currentIdx];
       if (token) {
         this.setMatch(token, activeTextEditor);
       }
