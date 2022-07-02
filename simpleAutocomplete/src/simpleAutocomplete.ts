@@ -6,11 +6,12 @@ import { fuzzySearch } from './fuzzySearch';
 export class SimpleAutocomplete {
   private state: {
     needle: string;
-    nextIterator: IterableIterator<boolean> | undefined;
+    nextIterator: IterableIterator<string> | undefined;
     preventReset: boolean;
     foundMatches: string[];
     currentIdx: number;
     isActive: boolean;
+    nextDone: boolean;
   };
 
   constructor() {
@@ -30,6 +31,7 @@ export class SimpleAutocomplete {
         foundMatches: [],
         currentIdx: -1,
         isActive: false,
+        nextDone: false,
       };
     }
   }
@@ -38,14 +40,10 @@ export class SimpleAutocomplete {
     this.state.isActive = true;
 
     if (this.canAutocomplete(activeTextEditor)) {
-      if (!this.state.nextIterator) {
-        this.state.nextIterator = this.nextGenerator(activeTextEditor);
-      }
-
-      const nextResult = this.state.nextIterator.next();
-
-      if (nextResult.done) {
-        this.setMatch(this.state.needle, activeTextEditor).then(this.reset);
+      const idx = this.getNextMatchIdx(activeTextEditor);
+      const token = this.state.foundMatches[idx];
+      if (token) {
+        this.setMatch(token, activeTextEditor);
       }
     } else {
       this.reset();
@@ -84,17 +82,34 @@ export class SimpleAutocomplete {
     }
   }
 
+  private getNextMatchIdx(activeTextEditor: TextEditor): number {
+    if (this.state.currentIdx < this.state.foundMatches.length - 1) {
+      return this.state.currentIdx + 1;
+    }
+
+    if (this.state.nextDone) {
+      return 0;
+    }
+
+    if (!this.state.nextIterator) {
+      this.state.nextIterator = this.nextGenerator(activeTextEditor);
+    }
+
+    const nextResult = this.state.nextIterator.next();
+    if (nextResult.done) {
+      this.state.nextDone = true;
+      return 0;
+    } else {
+      const token = nextResult.value;
+      this.state.foundMatches.push(token);
+      return this.state.foundMatches.length - 1;
+    }
+  }
+
   private *nextGenerator(activeTextEditor: TextEditor) {
     this.setNeedle(activeTextEditor);
 
     if (!this.state.needle) {
-      return;
-    }
-
-    if (this.state.currentIdx < this.state.foundMatches.length - 1) {
-      this.state.currentIdx += 1;
-      const token = this.state.foundMatches[this.state.currentIdx];
-      this.setMatch(token, activeTextEditor);
       return;
     }
 
@@ -109,10 +124,7 @@ export class SimpleAutocomplete {
           fuzzySearch(this.state.needle.toLowerCase(), token.toLowerCase()) &&
           this.state.foundMatches.indexOf(token) === -1
         ) {
-          this.state.foundMatches.push(token);
-          this.state.currentIdx += 1;
-          this.setMatch(token, activeTextEditor);
-          yield true;
+          yield token;
         }
       }
     }
