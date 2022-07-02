@@ -28,7 +28,7 @@ export class SimpleAutocomplete {
         nextIterator: undefined,
         preventReset: false,
         foundMatches: [],
-        currentIdx: 0,
+        currentIdx: -1,
         isActive: false,
       };
     }
