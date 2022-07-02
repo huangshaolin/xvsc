@@ -8,12 +8,14 @@ export class SimpleAutocomplete {
     needle: string;
     nextIterator: IterableIterator<boolean> | undefined;
     preventReset: boolean;
-    discardedMatches: string[];
+    foundMatches: string[];
+    currentIdx: number;
     isActive: boolean;
   };
 
   constructor() {
     this.next = this.next.bind(this);
+    this.prev = this.prev.bind(this);
     this.reset = this.reset.bind(this);
 
     this.reset();
@@ -25,7 +27,8 @@ export class SimpleAutocomplete {
         needle: '',
         nextIterator: undefined,
         preventReset: false,
-        discardedMatches: [],
+        foundMatches: [],
+        currentIdx: 0,
         isActive: false,
       };
     }
@@ -47,6 +50,22 @@ export class SimpleAutocomplete {
     } else {
       this.reset();
     }
+  }
+  public prev(activeTextEditor: TextEditor) {
+    if (this.state.isActive && this.state.foundMatches.length) {
+      let idx = 0;
+      if (this.state.currentIdx > 0) {
+        idx = this.state.currentIdx - 1;
+      } else {
+        idx = this.state.foundMatches.length - 1;
+      }
+      this.state.currentIdx = idx;
+      const token = this.state.foundMatches[this.state.currentIdx];
+      this.setMatch(token, activeTextEditor);
+      return;
+    }
+
+    this.reset();
   }
 
   private canAutocomplete(activeTextEditor: TextEditor) {
@@ -72,6 +91,13 @@ export class SimpleAutocomplete {
       return;
     }
 
+    if (this.state.currentIdx < this.state.foundMatches.length - 1) {
+      this.state.currentIdx += 1;
+      const token = this.state.foundMatches[this.state.currentIdx];
+      this.setMatch(token, activeTextEditor);
+      return;
+    }
+
     const { document, selection } = activeTextEditor;
     const documentIterator = documentRippleScanner(document, selection.end.line);
     for (const line of documentIterator) {
@@ -81,9 +107,10 @@ export class SimpleAutocomplete {
       for (const token of tokensIterator) {
         if (
           fuzzySearch(this.state.needle.toLowerCase(), token.toLowerCase()) &&
-          this.state.discardedMatches.indexOf(token) === -1
+          this.state.foundMatches.indexOf(token) === -1
         ) {
-          this.state.discardedMatches.push(token);
+          this.state.foundMatches.push(token);
+          this.state.currentIdx += 1;
           this.setMatch(token, activeTextEditor);
           yield true;
         }
@@ -96,7 +123,8 @@ export class SimpleAutocomplete {
     const needle = document.getText(document.getWordRangeAtPosition(selection.end));
 
     if (typeof needle === 'string') {
-      this.state.discardedMatches.push(needle);
+      this.state.foundMatches.push(needle);
+      this.state.currentIdx += 1;
       this.state.needle = needle;
     }
   }
